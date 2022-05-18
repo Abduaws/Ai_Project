@@ -10,6 +10,58 @@ from networkx.drawing.nx_pydot import graphviz_layout
 import random
 
 
+class selectDia(QtWidgets.QDialog):
+    def __init__(self, node_list, parent=None):
+        super().__init__(parent)
+        self.setObjectName("Dialog")
+        self.resize(400, 438)
+        self.setWindowIcon(QtGui.QIcon(resource_path("icon.ico")))
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.setFont(font)
+        self.buttonBox = QtWidgets.QDialogButtonBox(self)
+        self.buttonBox.setGeometry(QtCore.QRect(30, 390, 341, 32))
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.listWidget = QtWidgets.QListWidget(self)
+        self.listWidget.setGeometry(QtCore.QRect(10, 50, 371, 331))
+        self.listWidget.setObjectName("listWidget")
+        self.listWidget.setSelectionMode(self.listWidget.MultiSelection)
+        self.label = QtWidgets.QLabel(self)
+        self.label.setGeometry(QtCore.QRect(20, 15, 141, 21))
+        font = QtGui.QFont()
+        font.setPointSize(11)
+        self.label.setFont(font)
+        self.label.setObjectName("label")
+
+        self.node_selection = []
+
+        for node in node_list:
+            item = QtWidgets.QListWidgetItem()
+            item.setText(str(node))
+            self.listWidget.addItem(item)
+
+        self.retranslateUi()
+        self.buttonBox.accepted.connect(self.accept_press)  # type: ignore
+        self.buttonBox.rejected.connect(self.reject_press)  # type: ignore
+        QtCore.QMetaObject.connectSlotsByName(self)
+
+    def retranslateUi(self):
+        _translate = QtCore.QCoreApplication.translate
+        self.setWindowTitle(_translate("Dialog", "Select Nodes"))
+        self.label.setText(_translate("Dialog", "Select Nodes:"))
+
+    def accept_press(self):
+        for item in self.listWidget.selectedItems():
+            self.node_selection.append(item.text())
+        self.close()
+
+    def reject_press(self):
+        self.close()
+
+
+
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
@@ -31,6 +83,11 @@ class Ui_MainWindow(object):
         self.timer = QtCore.QTimer(MainWindow)
         self.timer.setInterval(1000)
         self.timer.timeout.connect(self.coloring)
+
+        self.mult_goal_timer = QtCore.QTimer(MainWindow)
+        self.mult_goal_timer.setInterval(50)
+        self.mult_goal_timer.timeout.connect(self.solve_mul)
+
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.label = QtWidgets.QLabel(self.centralwidget)
@@ -234,7 +291,8 @@ class Ui_MainWindow(object):
         self.devastar.clicked.connect(lambda : self.ASTAR(True))
         self.devgreedy.clicked.connect(lambda : self.GFS(True))
         self.devnocolor.clicked.connect(self.togglecolor)
-        self.testheu.clicked.connect(self.test)
+        self.testheu.clicked.connect(self.get_heu)
+        self.finalnodechoose.currentTextChanged.connect(self.mult_nodes_check)
         #self.inputnodes.textChanged.connect(self.get_active_nodes)
 
         self.Visualizer = nx.Graph()
@@ -259,7 +317,10 @@ class Ui_MainWindow(object):
         self.test_case_counter = 0
         self.static_graph_pos = graphviz_layout
         self.static_check = False
-
+        self.goal_nodes = []
+        self.goal_index = 0
+        self.insolve = False
+        self.reenter = True
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -271,17 +332,24 @@ class Ui_MainWindow(object):
         self.Visualizer = nx.Graph()
         self.start_click()
 
-    def test(self):
-        pass
-        #############################################
-        # HEURISTIC TEST
-        #############################################
+    def get_heu(self):
+        if self.node_atrr:
+            self.reenter_heu()
+            if not self.reenter: return
         heu = dict()
         for node in list(self.Visualizer.nodes):
             heu[node], done = QtWidgets.QInputDialog.getText(MainWindow, "H(N)", f"Enter heuristic of Node: {node}")
         for node, heu_val in heu.items():
             self.node_atrr[node] = int(heu_val)
         self.draw_graph()
+
+    def mult_nodes_check(self):
+        if self.finalnodechoose.currentText() == "Multiple":
+            dialog = selectDia(node_list=[self.finalnodechoose.itemText(i) for i in range(self.finalnodechoose.count()) if self.finalnodechoose.itemText(i)!="Multiple"])
+            dialog.exec_()
+            if not dialog.node_selection: self.finalnodechoose.setCurrentIndex(0)
+            self.goal_nodes = dialog.node_selection
+            #print(self.goal_nodes)
 
     def togglecolor(self):
         self.colorof = not self.colorof
@@ -479,6 +547,49 @@ class Ui_MainWindow(object):
         shortest_path.reverse()
         return shortest_path
 
+    def solve_mul(self):
+        if not self.insolve:
+            self.insolve = True
+            if self.goal_index == len(self.goal_nodes):
+                self.goal_index = 0
+                self.mult_goal_timer.stop()
+                return
+            self.finalnodechoose.setCurrentText(self.goal_nodes[self.goal_index])
+            if self.algochoose.currentText() == "Breadth First":
+                self.BFS()
+            elif self.algochoose.currentText() == "Depth First":
+                self.DFS()
+            elif self.algochoose.currentText() == "Uniform Cost":
+                self.UCS()
+            elif self.algochoose.currentText() == "Iterative Deepening":
+                self.IDDFS()
+            elif self.algochoose.currentText() == "Greedy First": self.GFS()
+            elif self.algochoose.currentText() == "A* Search": self.ASTAR()
+
+            if self.colorof:
+                self.show_solution()
+                self.path = ""
+                self.shortest_path = []
+                self.ufccost = 0
+                self.dfsparent = dict()
+                self.dfspathfound = False
+                self.drawing_counter = 0
+                self.iddfs_path_index = 0
+                self.iddfs_paths = []
+                return
+            self.done.setEnabled(False)
+            self.label_3.setEnabled(False)
+            self.algochoose.setEnabled(False)
+            self.label_4.setEnabled(False)
+            self.initialnodechoose.setEnabled(False)
+            self.label_5.setEnabled(False)
+            self.finalnodechoose.setEnabled(False)
+            self.backbtn.setEnabled(False)
+
+            self.timer.start()
+
+            self.goal_index += 1
+
     def done_click(self):
         if self.label_5.isHidden() == True:
             if len(list(self.Visualizer.nodes)) == 0 :
@@ -515,47 +626,54 @@ class Ui_MainWindow(object):
             for i in list(self.Visualizer.nodes):
                 if self.initialnodechoose.currentText() == str(i) : continue
                 self.finalnodechoose.addItem(str(i))
+            self.finalnodechoose.addItem("Multiple")
 
             self.path = ""
         else:
-            if self.algochoose.currentText() == "Breadth First" : self.BFS()
-            elif self.algochoose.currentText() == "Depth First" : self.DFS()
-            elif self.algochoose.currentText() == "Uniform Cost" : self.UCS()
-            elif self.algochoose.currentText() == "Iterative Deepening" : self.IDDFS()
-            elif self.algochoose.currentText() == "Greedy First":
-                self.test()
-                self.GFS()
-            elif self.algochoose.currentText() == "A* Search":
-                self.test()
-                self.ASTAR()
+            if self.finalnodechoose.currentText() != "Multiple":
+                if self.algochoose.currentText() == "Breadth First" : self.BFS()
+                elif self.algochoose.currentText() == "Depth First" : self.DFS()
+                elif self.algochoose.currentText() == "Uniform Cost" : self.UCS()
+                elif self.algochoose.currentText() == "Iterative Deepening" : self.IDDFS()
+                elif self.algochoose.currentText() == "Greedy First":
+                    self.get_heu()
+                    self.GFS()
+                elif self.algochoose.currentText() == "A* Search":
+                    self.get_heu()
+                    self.ASTAR()
 
-            if self.colorof:
-                self.show_solution()
-                self.path = ""
-                self.shortest_path = []
-                self.ufccost = 0
-                self.dfsparent = dict()
-                self.dfspathfound = False
-                self.drawing_counter = 0
-                self.iddfs_path_index = 0
-                self.iddfs_paths = []
-                return
-            self.done.setEnabled(False)
-            self.label_3.setEnabled(False)
-            self.algochoose.setEnabled(False)
-            self.label_4.setEnabled(False)
-            self.initialnodechoose.setEnabled(False)
-            self.label_5.setEnabled(False)
-            self.finalnodechoose.setEnabled(False)
-            self.backbtn.setEnabled(False)
+                if self.colorof:
+                    self.show_solution()
+                    self.path = ""
+                    self.shortest_path = []
+                    self.ufccost = 0
+                    self.dfsparent = dict()
+                    self.dfspathfound = False
+                    self.drawing_counter = 0
+                    self.iddfs_path_index = 0
+                    self.iddfs_paths = []
+                    return
+                self.done.setEnabled(False)
+                self.label_3.setEnabled(False)
+                self.algochoose.setEnabled(False)
+                self.label_4.setEnabled(False)
+                self.initialnodechoose.setEnabled(False)
+                self.label_5.setEnabled(False)
+                self.finalnodechoose.setEnabled(False)
+                self.backbtn.setEnabled(False)
 
-            self.timer.start()
+                self.timer.start()
+            else:
+                self.insolve = False
+                if self.algochoose.currentText() == "Greedy First" or self.algochoose.currentText() == "A* Search": self.get_heu()
+                self.mult_goal_timer.start()
 
     def refresh_combobox(self):
         self.finalnodechoose.clear()
         for i in list(self.Visualizer.nodes):
             if self.initialnodechoose.currentText() == str(i): continue
             self.finalnodechoose.addItem(str(i))
+        self.finalnodechoose.addItem("Multiple")
 
     def BFS(self, devcheck = False):
         if devcheck:
@@ -576,7 +694,7 @@ class Ui_MainWindow(object):
         path_found = False
         while len(queue) > 0 :
             s = queue.pop(0)
-            print(s, end=" ")
+            #print(s, end=" ")
             if self.path == "" : self.path = str(s)
             else: self.path = self.path + "->" + str(s)
             if str(s) == self.finalnodechoose.currentText() :
@@ -627,7 +745,7 @@ class Ui_MainWindow(object):
         parents[self.initialnodechoose.currentText()] = None
         while len(queue) > 0:
             s = queue.pop(0)
-            print(s, end=" ")
+            #print(s, end=" ")
             if s in not_chosen.keys():not_chosen.pop(s)
             if self.path == "":self.path = str(s)
             else:self.path = self.path + "->" + str(s)
@@ -653,8 +771,10 @@ class Ui_MainWindow(object):
                         minim_hue = hue
                         minim_node = node
                 if flag:
-                    for node in node_to_remove:not_chosen.pop(node)
-                    for node in node_to_add:not_chosen[node] = self.node_atrr[node]
+                    for node in node_to_remove: not_chosen.pop(node)
+                    print(node_to_add)
+                    for node in node_to_add:
+                        if node: not_chosen[node] = self.node_atrr[node]
             queue.append(minim_node)
             parents[minim_node] = s
             visited[nodes.index(minim_node)] = True
@@ -688,7 +808,7 @@ class Ui_MainWindow(object):
             if not color_map:
                 self.figure.clear()
                 nx.draw_networkx(self.Visualizer, pos)
-                print(list(self.Visualizer.nodes))
+                #print(list(self.Visualizer.nodes))
                 nx.draw_networkx_edge_labels(self.Visualizer, pos, edge_labels=self.edge_labels)
                 if len(self.node_atrr) > 0:
                     for node in list(self.Visualizer.nodes):
@@ -722,7 +842,7 @@ class Ui_MainWindow(object):
     def DFSUtil(self, visited, current):
         if self.dfspathfound: return
         visited.append(current)
-        print(current, end=' ')
+        #print(current, end=' ')
         if self.path == "": self.path = str(current)
         else: self.path = self.path + "->" + str(current)
         if str(current) == self.finalnodechoose.currentText():
@@ -747,7 +867,7 @@ class Ui_MainWindow(object):
         self.DFSUtil(visited, nodes[nodes.index(str(self.initialnodechoose.currentText()))])
         target_node = self.finalnodechoose.currentText()
         if self.dfspathfound:
-            print(self.get_parent_path(self.dfsparent, target_node))
+            #print(self.get_parent_path(self.dfsparent, target_node))
             self.shortest_path = self.get_parent_path(self.dfsparent,target_node)
         if self.colorof:
             color_map = []
@@ -841,7 +961,7 @@ class Ui_MainWindow(object):
             self.IDDFSUtil(visited, nodes[nodes.index(str(self.initialnodechoose.currentText()))], i)
             self.iddfs_paths.append(self.path.split("->"))
             if self.dfspathfound: break
-            print("\n")
+            #print("\n")
             self.dfsparent.clear()
             self.ufccost = 0
             self.dfspathfound = False
@@ -961,6 +1081,7 @@ class Ui_MainWindow(object):
             display_text = display_text +"\nPath To Solution is: "+path_to_FinalNode+"\nShortest Path To Solution is: "+shortest_path_str
             msg.setInformativeText(display_text)
             x = msg.exec_()
+            self.insolve = False
             return
         if self.algochoose.currentText() == "Uniform Cost" or self.algochoose.currentText() == "A* Search":
             paz = ""
@@ -978,9 +1099,11 @@ class Ui_MainWindow(object):
                     cost_without_heu -= self.node_atrr[node]
                 msg.setInformativeText("Problem was solved using: " + self.algochoose.currentText() + "\nInitial State: " + self.initialnodechoose.currentText() + "\nFinal State: " + self.finalnodechoose.currentText() + "\nSolution Path is: " + paz + "\nPath Cost Without Heuristic is : " + str(cost_without_heu) + "\nPath Cost With Heuristic is : " + str(self.ufccost))
             x = msg.exec_()
+            self.insolve = False
             return
         msg.setInformativeText("Problem was solved using: "+self.algochoose.currentText()+"\nInitial State: "+self.initialnodechoose.currentText()+"\nFinal State: "+self.finalnodechoose.currentText()+"\nPath To Solution is: "+path_to_FinalNode+"\nShortest Path To Solution is: "+shortest_path)
         x = msg.exec_()
+        self.insolve = False
 
     def get_active_nodes(self):
         self.reset_click()
@@ -1037,7 +1160,6 @@ class Ui_MainWindow(object):
             MainWindow.resize(1632, 837)
             MainWindow.setFixedSize(1632, 837)
         else:
-            print("cancel")
             MainWindow.resize(1109, 837)
             MainWindow.setFixedSize(1109, 837)
             self.dev_flag = False
@@ -1060,7 +1182,8 @@ class Ui_MainWindow(object):
             color_map = ["grey"] * len(self.Visualizer.nodes)
             if self.iddfs_path_index == len(self.iddfs_paths):
                 for path in self.iddfs_paths:
-                    print(path)
+                    pass
+                    #print(path)
                 self.show_solution()
                 self.path = ""
                 self.shortest_path = []
@@ -1147,6 +1270,20 @@ class Ui_MainWindow(object):
                 color_map[list(self.Visualizer.nodes).index(self.finalnodechoose.currentText())] = "yellow"
             self.draw_graph(color_map)
             self.drawing_counter+=1
+
+    def reenter_heu(self):
+        def btn_popup_click(i):
+            if i.text() == "OK": self.reenter = True
+            else: self.reenter = False
+        msg = QtWidgets.QMessageBox()
+        msg.setWindowTitle("Re-Enter")
+        msg.setWindowIcon(QtGui.QIcon(resource_path("icon.png")))
+        msg.setText("Do you want to Re Enter Heuristic?")
+        msg.setIcon(QtWidgets.QMessageBox.Question)
+        msg.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
+        msg.buttonClicked.connect(btn_popup_click)
+        x = msg.exec_()
+        return x
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
