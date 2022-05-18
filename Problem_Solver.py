@@ -5,6 +5,10 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 import os
+import pydot
+from networkx.drawing.nx_pydot import graphviz_layout
+import random
+
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -16,7 +20,9 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+
 class Ui_MainWindow(object):
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1109, 837)
@@ -251,17 +257,20 @@ class Ui_MainWindow(object):
         self.iddfs_path_index = 0
         self.colorof = False
         self.test_case_counter = 0
-        self.static_graph_pos = nx.spring_layout
+        self.static_graph_pos = graphviz_layout
         self.static_check = False
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
     def directed_click(self):
         self.Visualizer = nx.DiGraph()
         self.start_click()
+
     def undirected_click(self):
         self.Visualizer = nx.Graph()
         self.start_click()
+
     def test(self):
         pass
         #############################################
@@ -273,8 +282,10 @@ class Ui_MainWindow(object):
         for node, heu_val in heu.items():
             self.node_atrr[node] = int(heu_val)
         self.draw_graph()
+
     def togglecolor(self):
         self.colorof = not self.colorof
+
     def start_click(self):
         self.label.setEnabled(True)
         self.label.setHidden(False)
@@ -299,6 +310,7 @@ class Ui_MainWindow(object):
         self.directedsolvebtn.setHidden(True)
         self.undirectedsolvebtn.setEnabled(False)
         self.undirectedsolvebtn.setHidden(True)
+
     def back_click(self):
         if self.inputnodes.isHidden() == True :
             self.done.setEnabled(False)
@@ -354,6 +366,7 @@ class Ui_MainWindow(object):
             self.directedsolvebtn.setHidden(False)
             self.undirectedsolvebtn.setEnabled(True)
             self.undirectedsolvebtn.setHidden(False)
+
     def add_click(self):
         if self.dev_flag:
             if self.test_case_counter>1:self.test_case_counter=0
@@ -425,7 +438,7 @@ class Ui_MainWindow(object):
                 self.test_case_counter+=1
             self.static_check = False
             self.draw_graph()
-            self.static_graph_pos = nx.spring_layout(self.Visualizer)
+            self.static_graph_pos = graphviz_layout(self.Visualizer)
             self.static_check = True
             self.nodes = list(self.Visualizer.nodes)
             self.edges = list(self.Visualizer.edges)
@@ -441,12 +454,13 @@ class Ui_MainWindow(object):
             self.Visualizer.add_edges_from(self.edges)
             self.static_check = False
             self.draw_graph()
-            self.static_graph_pos = nx.spring_layout(self.Visualizer)
+            self.static_graph_pos = graphviz_layout(self.Visualizer)
             self.static_check = True
             self.nodes = list(self.Visualizer.nodes)
             self.edges = list(self.Visualizer.edges)
         except:
             self.error_popup("Please Enter Edges In Correct Format","Format Example: 1,2,3 or 2,5,6")
+
     def reset_click(self, check = False):
         if check:
             self.edges = list()
@@ -455,6 +469,7 @@ class Ui_MainWindow(object):
             self.edge_labels = dict()
         self.Visualizer.clear()
         self.draw_graph()
+
     def get_parent_path(self, parents, node):
         shortest_path = [node]
         curr = node
@@ -463,6 +478,7 @@ class Ui_MainWindow(object):
             curr = parents[curr]
         shortest_path.reverse()
         return shortest_path
+
     def done_click(self):
         if self.label_5.isHidden() == True:
             if len(list(self.Visualizer.nodes)) == 0 :
@@ -534,11 +550,13 @@ class Ui_MainWindow(object):
             self.backbtn.setEnabled(False)
 
             self.timer.start()
+
     def refresh_combobox(self):
         self.finalnodechoose.clear()
         for i in list(self.Visualizer.nodes):
             if self.initialnodechoose.currentText() == str(i): continue
             self.finalnodechoose.addItem(str(i))
+
     def BFS(self, devcheck = False):
         if devcheck:
             if self.test_case_counter == 0:
@@ -561,7 +579,9 @@ class Ui_MainWindow(object):
             print(s, end=" ")
             if self.path == "" : self.path = str(s)
             else: self.path = self.path + "->" + str(s)
-            if str(s) == self.finalnodechoose.currentText() : path_found = True
+            if str(s) == self.finalnodechoose.currentText() :
+                path_found = True
+                break
             for i in list(self.Visualizer.adj.get(s)):
                 if visited[nodes.index(i)] == False:
                     queue.append(i)
@@ -588,6 +608,7 @@ class Ui_MainWindow(object):
             self.dfsparent = dict()
             self.dfspathfound = False
             self.drawing_counter = 0
+
     def GFS(self, devcheck = False):
         if devcheck:
             if self.test_case_counter == 0:
@@ -658,19 +679,23 @@ class Ui_MainWindow(object):
             self.dfsparent = dict()
             self.dfspathfound = False
             self.drawing_counter = 0
+
     def draw_graph(self, color_map = []):
-        pos = nx.spring_layout(self.Visualizer)
+        pos = graphviz_layout(self.Visualizer)
+        if list(self.Visualizer.nodes): pos = graphviz_layout(self.Visualizer)
         if self.static_check: pos = self.static_graph_pos
         try:
             if not color_map:
                 self.figure.clear()
                 nx.draw_networkx(self.Visualizer, pos)
+                print(list(self.Visualizer.nodes))
                 nx.draw_networkx_edge_labels(self.Visualizer, pos, edge_labels=self.edge_labels)
                 if len(self.node_atrr) > 0:
                     for node in list(self.Visualizer.nodes):
                         x, y = pos[node]
-                        plt.text(x, y + 0.07, s=self.node_atrr[node], color="red", zorder=20.0,
-                                 horizontalalignment='center')
+                        plt.text(x, y + 7, s=self.node_atrr[node], color="black", zorder=20.0,
+                                 horizontalalignment='center', bbox=dict(facecolor='red', alpha=0.5))
+                plt.tight_layout()
                 plt.draw()
             else:
                 self.figure.clear()
@@ -679,8 +704,9 @@ class Ui_MainWindow(object):
                 if len(self.node_atrr)>0:
                     for node in list(self.Visualizer.nodes):
                         x, y = pos[node]
-                        plt.text(x, y+0.07, s=self.node_atrr[node], color="red", zorder=20.0,
-                                 horizontalalignment='center')
+                        plt.text(x, y+7, s=self.node_atrr[node], color="black", zorder=20.0,
+                                 horizontalalignment='center', bbox=dict(facecolor='red', alpha=0.5))
+                plt.tight_layout()
                 plt.draw()
         except:
             self.figure.clear()
@@ -688,19 +714,25 @@ class Ui_MainWindow(object):
             if len(self.node_atrr) > 0:
                 for node in list(self.Visualizer.nodes):
                     x, y = pos[node]
-                    plt.text(x, y + 0.07, s=self.node_atrr[node], color="red", zorder=20.0,
-                             horizontalalignment='center')
+                    plt.text(x, y + 7, s=self.node_atrr[node], color="black", zorder=20.0,
+                             horizontalalignment='center', bbox=dict(facecolor='red', alpha=0.5))
+            plt.tight_layout()
             plt.draw()
+
     def DFSUtil(self, visited, current):
+        if self.dfspathfound: return
         visited.append(current)
         print(current, end=' ')
         if self.path == "": self.path = str(current)
         else: self.path = self.path + "->" + str(current)
-        if str(current) == self.finalnodechoose.currentText(): self.dfspathfound = True
+        if str(current) == self.finalnodechoose.currentText():
+            self.dfspathfound = True
+            return
         for adj in list(self.Visualizer.adj.get(current)):
             if adj not in visited:
                 self.dfsparent[str(adj)] = str(current)
                 self.DFSUtil(visited, adj)
+
     def DFS(self, devcheck = False):
         if devcheck:
             if self.test_case_counter == 0:
@@ -736,6 +768,7 @@ class Ui_MainWindow(object):
             self.ufccost = 0
             self.dfspathfound = False
             self.drawing_counter = 0
+
     def ASTAR(self, devcheck = False):
         if devcheck:
             if self.test_case_counter == 0:
@@ -777,7 +810,9 @@ class Ui_MainWindow(object):
             self.dfsparent = dict()
             self.dfspathfound = False
             self.drawing_counter = 0
+
     def IDDFSUtil(self, visited, current, depth):
+        if self.dfspathfound: return
         if dict(nx.all_pairs_shortest_path_length(self.Visualizer))[self.initialnodechoose.currentText()][str(current)]>depth:
             return False
         visited.append(current)
@@ -790,6 +825,7 @@ class Ui_MainWindow(object):
             if adj not in visited:
                 self.dfsparent[str(adj)] = str(current)
                 self.IDDFSUtil(visited, adj, depth)
+
     def IDDFS(self, devcheck = False):
         if devcheck:
             if self.test_case_counter == 0:
@@ -831,6 +867,7 @@ class Ui_MainWindow(object):
             self.drawing_counter = 0
             self.iddfs_path_index = 0
             self.iddfs_paths = []
+
     def UCS(self, devcheck = False):
         if devcheck:
             if self.test_case_counter == 0:
@@ -872,6 +909,7 @@ class Ui_MainWindow(object):
             self.dfsparent = dict()
             self.dfspathfound = False
             self.drawing_counter = 0
+
     def show_solution(self):
         search_path = self.path.split("->")
         path_to_FinalNode = ""
@@ -941,8 +979,9 @@ class Ui_MainWindow(object):
                 msg.setInformativeText("Problem was solved using: " + self.algochoose.currentText() + "\nInitial State: " + self.initialnodechoose.currentText() + "\nFinal State: " + self.finalnodechoose.currentText() + "\nSolution Path is: " + paz + "\nPath Cost Without Heuristic is : " + str(cost_without_heu) + "\nPath Cost With Heuristic is : " + str(self.ufccost))
             x = msg.exec_()
             return
-        msg.setInformativeText("Problem was solved using: "+self.algochoose.currentText()+"\nInitial State: "+self.initialnodechoose.currentText()+"\nFinal State: "+self.finalnodechoose.currentText()+"\nSearch Path Taken is: "+self.path+"\nPath To Solution is: "+path_to_FinalNode+"\nShortest Path To Solution is: "+shortest_path)
+        msg.setInformativeText("Problem was solved using: "+self.algochoose.currentText()+"\nInitial State: "+self.initialnodechoose.currentText()+"\nFinal State: "+self.finalnodechoose.currentText()+"\nPath To Solution is: "+path_to_FinalNode+"\nShortest Path To Solution is: "+shortest_path)
         x = msg.exec_()
+
     def get_active_nodes(self):
         self.reset_click()
         self.Visualizer.add_nodes_from(self.nodes)
@@ -980,6 +1019,7 @@ class Ui_MainWindow(object):
             self.Visualizer.add_edges_from(self.edges)
             self.draw_graph()
             return
+
     def error_popup(self,err_msg,extra=""):
         msg = QtWidgets.QMessageBox()
         msg.setWindowTitle("Error")
@@ -989,6 +1029,7 @@ class Ui_MainWindow(object):
         msg.setInformativeText(err_msg)
         if extra != "" : msg.setDetailedText(extra)
         x = msg.exec_()
+
     def btn_popup_click(self, i):
         if i.text() == "OK":
             self.dev_flag = True
@@ -1001,6 +1042,7 @@ class Ui_MainWindow(object):
             MainWindow.setFixedSize(1109, 837)
             self.dev_flag = False
             self.dev_count = 0
+
     def dev_mode(self, event):
         self.dev_count += 1
         if self.dev_count == 7:
@@ -1012,6 +1054,7 @@ class Ui_MainWindow(object):
             msg.setStandardButtons(QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel)
             msg.buttonClicked.connect(self.btn_popup_click)
             x = msg.exec_()
+
     def coloring(self):
         if self.algochoose.currentText() == "Iterative Deepening":
             color_map = ["grey"] * len(self.Visualizer.nodes)
@@ -1104,6 +1147,7 @@ class Ui_MainWindow(object):
                 color_map[list(self.Visualizer.nodes).index(self.finalnodechoose.currentText())] = "yellow"
             self.draw_graph(color_map)
             self.drawing_counter+=1
+
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Problem Solver"))
