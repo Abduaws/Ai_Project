@@ -61,7 +61,6 @@ class selectDia(QtWidgets.QDialog):
         self.close()
 
 
-
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
@@ -506,7 +505,7 @@ class Ui_MainWindow(object):
                 self.test_case_counter+=1
             self.static_check = False
             self.draw_graph()
-            self.static_graph_pos = graphviz_layout(self.Visualizer)
+            self.static_graph_pos = graphviz_layout(self.Visualizer, prog=resource_path("neato.exe"))
             self.static_check = True
             self.nodes = list(self.Visualizer.nodes)
             self.edges = list(self.Visualizer.edges)
@@ -522,7 +521,7 @@ class Ui_MainWindow(object):
             self.Visualizer.add_edges_from(self.edges)
             self.static_check = False
             self.draw_graph()
-            self.static_graph_pos = graphviz_layout(self.Visualizer)
+            self.static_graph_pos = graphviz_layout(self.Visualizer, prog=resource_path("neato.exe"))
             self.static_check = True
             self.nodes = list(self.Visualizer.nodes)
             self.edges = list(self.Visualizer.edges)
@@ -772,7 +771,7 @@ class Ui_MainWindow(object):
                         minim_node = node
                 if flag:
                     for node in node_to_remove: not_chosen.pop(node)
-                    print(node_to_add)
+                    #print(node_to_add)
                     for node in node_to_add:
                         if node: not_chosen[node] = self.node_atrr[node]
             queue.append(minim_node)
@@ -801,8 +800,8 @@ class Ui_MainWindow(object):
             self.drawing_counter = 0
 
     def draw_graph(self, color_map = []):
-        pos = graphviz_layout(self.Visualizer)
-        if list(self.Visualizer.nodes): pos = graphviz_layout(self.Visualizer)
+        pos = graphviz_layout(self.Visualizer, prog=resource_path("neato.exe"))
+        if list(self.Visualizer.nodes): pos = graphviz_layout(self.Visualizer, prog=resource_path("neato.exe"))
         if self.static_check: pos = self.static_graph_pos
         try:
             if not color_map:
