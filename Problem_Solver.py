@@ -635,10 +635,17 @@ class Ui_MainWindow(object):
                 elif self.algochoose.currentText() == "Uniform Cost" : self.UCS()
                 elif self.algochoose.currentText() == "Iterative Deepening" : self.IDDFS()
                 elif self.algochoose.currentText() == "Greedy First":
-                    self.get_heu()
+                    try:self.get_heu()
+                    except:
+                        self.error_popup("Please Enter Heuristic in correct Format!")
+                        return
                     self.GFS()
                 elif self.algochoose.currentText() == "A* Search":
-                    self.get_heu()
+                    try:
+                        self.get_heu()
+                    except:
+                        self.error_popup("Please Enter Heuristic in correct Format!")
+                        return
                     self.ASTAR()
 
                 if self.colorof:
@@ -664,7 +671,11 @@ class Ui_MainWindow(object):
                 self.timer.start()
             else:
                 self.insolve = False
-                if self.algochoose.currentText() == "Greedy First" or self.algochoose.currentText() == "A* Search": self.get_heu()
+                if self.algochoose.currentText() == "Greedy First" or self.algochoose.currentText() == "A* Search":
+                    try:self.get_heu()
+                    except:
+                        self.error_popup("Please Enter Heuristic in correct Format!")
+                        return
                 self.mult_goal_timer.start()
 
     def refresh_combobox(self):
